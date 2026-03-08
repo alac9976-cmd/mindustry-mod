@@ -1,0 +1,6 @@
+name: baka-network-stats
+displayName: Network Stats
+author: AnLac
+version: 1.0
+minGameVersion: 155
+main: scripts/stats.js
