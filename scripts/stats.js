@@ -1,30 +1,28 @@
 let production = {};
-let history = {};
-let historyLength = 60;
+let powerProduced = 0;
+let powerUsed = 0;
 
-function addProduction(item, amount){
-
-    if(production[item.id] == null){
-        production[item.id] = 0;
-    }
-
-    production[item.id] += amount;
-
+function resetStats(){
+    production = {};
+    powerProduced = 0;
+    powerUsed = 0;
 }
 
-function scanProduction(){
+function addProduction(item,amount){
+    if(production[item.id]==null){
+        production[item.id]=0;
+    }
+    production[item.id]+=amount;
+}
 
-    production = {};
+function scanBuildings(){
+
+    resetStats();
 
     const team = Vars.player.team();
 
-    Vars.world.tiles.each(tile => {
-
-        if(tile.build == null) return;
-
-        const build = tile.build;
-
-        if(build.team != team) return;
+    // chỉ quét building thay vì tile
+    Vars.indexer.getAll(team).each(build=>{
 
         const block = build.block;
 
@@ -33,10 +31,8 @@ function scanProduction(){
 
             const item = build.dominantItem;
 
-            if(item != null){
-
+            if(item!=null){
                 addProduction(item, build.lastDrillSpeed);
-
             }
 
         }
@@ -46,62 +42,56 @@ function scanProduction(){
 
             const output = block.outputItem;
 
-            if(output != null){
-
-                addProduction(output.item, 1 / block.craftTime);
-
+            if(output!=null){
+                addProduction(output.item,1/block.craftTime);
             }
 
+        }
+
+        // POWER
+        if(block.powerProduction>0){
+            powerProduced+=block.powerProduction;
+        }
+
+        if(block.consumesPower){
+            powerUsed+=block.consumesPower.capacity;
         }
 
     });
 
 }
 
-// lưu history
-Timer.schedule(() => {
+// cập nhật mỗi 3 giây thay vì 1
+Timer.schedule(()=>{
+    scanBuildings();
+},3,3);
 
-    scanProduction();
-
-    Vars.content.items().each(item => {
-
-        if(history[item.id] == null){
-            history[item.id] = [];
-        }
-
-        history[item.id].push(production[item.id] || 0);
-
-        if(history[item.id].length > historyLength){
-            history[item.id].shift();
-        }
-
-    });
-
-}, 1, 1);
-
-Events.on(ClientLoadEvent, e => {
+Events.on(ClientLoadEvent,e=>{
 
     const button = new TextButton("Stats");
 
-    button.clicked(() => {
+    button.clicked(()=>{
 
         const dialog = new BaseDialog("Production Statistics");
 
-        dialog.cont.pane(table => {
+        dialog.cont.pane(table=>{
 
-            table.update(() => {
+            table.update(()=>{
 
                 table.clear();
 
-                Vars.content.items().each(item => {
+                table.add("[accent]Power").row();
+                table.add("Produced: "+powerProduced.toFixed(1)).row();
+                table.add("Used: "+powerUsed.toFixed(1)).row();
+                table.row();
+
+                Vars.content.items().each(item=>{
 
                     const value = production[item.id] || 0;
 
-                    if(value > 0){
+                    if(value>0){
 
-                        table.add(item.localizedName).left().padRight(20);
-                        table.add((value * 60).toFixed(1) + " /min");
-                        table.row();
+                        table.add(item.localizedName+" "+(value*60).toFixed(1)+"/min").left().row();
 
                     }
 
