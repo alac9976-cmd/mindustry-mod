@@ -6,7 +6,22 @@ Events.on(ClientLoadEvent, e => {
 
         const dialog = new BaseDialog("Network Statistics");
 
-        dialog.cont.add("Mod loaded successfully").row();
+        dialog.cont.pane(t => {
+
+            const team = Vars.player.team();
+            const items = team.items();
+
+            Vars.content.items().each(item => {
+
+                const amount = items.get(item);
+
+                if(amount > 0){
+                    t.add(item.localizedName + ": " + amount).row();
+                }
+
+            });
+
+        }).size(400,300);
 
         dialog.addCloseButton();
         dialog.show();
