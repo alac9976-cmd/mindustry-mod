@@ -8,11 +8,11 @@ function resetStats(){
     powerUsed = 0;
 }
 
-function addProduction(item,amount){
-    if(production[item.id]==null){
-        production[item.id]=0;
+function addProduction(item, amount){
+    if(production[item.id] == null){
+        production[item.id] = 0;
     }
-    production[item.id]+=amount;
+    production[item.id] += amount;
 }
 
 function scanBuildings(){
@@ -20,9 +20,9 @@ function scanBuildings(){
     resetStats();
 
     const team = Vars.player.team();
+    const builds = team.data().buildings;
 
-    // chỉ quét building thay vì tile
-    Vars.indexer.getAll(team).each(build=>{
+    builds.each(build => {
 
         const block = build.block;
 
@@ -31,7 +31,7 @@ function scanBuildings(){
 
             const item = build.dominantItem;
 
-            if(item!=null){
+            if(item != null && build.lastDrillSpeed != null){
                 addProduction(item, build.lastDrillSpeed);
             }
 
@@ -42,33 +42,36 @@ function scanBuildings(){
 
             const output = block.outputItem;
 
-            if(output!=null){
-                addProduction(output.item,1/block.craftTime);
+            if(output != null){
+                addProduction(output.item, 1 / block.craftTime);
             }
 
         }
 
-        // POWER
-        if(block.powerProduction>0){
-            powerProduced+=block.powerProduction;
+        // POWER PRODUCED
+        if(block.powerProduction > 0){
+            powerProduced += block.powerProduction;
         }
 
-        if(block.consumesPower){
-            powerUsed+=block.consumesPower.capacity;
+        // POWER USED
+        const power = block.consumes.getPower();
+        if(power != null){
+            powerUsed += power.usage;
         }
 
     });
 
 }
 
-// cập nhật mỗi 3 giây thay vì 1
+// quét mỗi 3 giây
 Timer.schedule(()=>{
     scanBuildings();
 },3,3);
 
-Events.on(ClientLoadEvent,e=>{
 
-    const button = new TextButton("Stats");
+Events.on(ClientLoadEvent, e=>{
+
+    const button = new TextButton("Stats", Styles.defaultt);
 
     button.clicked(()=>{
 
@@ -89,10 +92,8 @@ Events.on(ClientLoadEvent,e=>{
 
                     const value = production[item.id] || 0;
 
-                    if(value>0){
-
-                        table.add(item.localizedName+" "+(value*60).toFixed(1)+"/min").left().row();
-
+                    if(value > 0){
+                        table.add(item.localizedName + " " + (value*60).toFixed(1) + "/min").left().row();
                     }
 
                 });
