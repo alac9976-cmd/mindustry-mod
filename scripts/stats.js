@@ -1,136 +1,95 @@
 let production = {};
+let lastItems = {};
 let powerProduced = 0;
 let powerUsed = 0;
+let timer = 0;
 
 function resetStats(){
     production = {};
+    lastItems = {};
     powerProduced = 0;
     powerUsed = 0;
 }
 
-function addProduction(item, amount){
-    if(!item) return;
+Events.on(EventType.WorldLoadEvent, e=>{
+    resetStats();
+});
 
-    if(production[item.id] == null){
-        production[item.id] = 0;
+function scanCore(){
+    let core = Vars.player.team().core();
+    if(!core) return;
+
+    let items = core.items;
+
+    Vars.content.items().each(item=>{
+        let amount = items.get(item);
+
+        if(lastItems[item.name] == null){
+            lastItems[item.name] = amount;
+        }
+
+        let diff = amount - lastItems[item.name];
+        production[item.name] = diff;
+
+        lastItems[item.name] = amount;
+    });
+}
+
+function scanPower(){
+
+    powerProduced = 0;
+    powerUsed = 0;
+
+    Vars.groups.build.each(b=>{
+        if(b.power != null){
+
+            if(b.block.consumesPower){
+                powerUsed += b.power.graph.getPowerNeeded();
+            }
+
+            if(b.block.outputsPower){
+                powerProduced += b.power.graph.getPowerProduced();
+            }
+
+        }
+    });
+}
+
+function drawUI(){
+
+    let table = new Table();
+    table.top().left();
+
+    table.add("MAP STATISTICS").row();
+
+    table.add("Power Produced: " + Math.floor(powerProduced)).row();
+    table.add("Power Used: " + Math.floor(powerUsed)).row();
+
+    table.add("Items / sec").row();
+
+    for(let key in production){
+        table.add(key + ": " + production[key]).row();
     }
 
-    production[item.id] += amount;
+    Vars.ui.hudGroup.addChild(table);
 }
 
-function scanBuildings(){
+Events.run(Trigger.update, ()=>{
 
-    if(!Vars.state || !Vars.state.isGame()) return;
-    if(!Vars.player) return;
+    timer += Time.delta;
 
-    const team = Vars.player.team();
-    if(!team) return;
+    if(timer > 60){
 
-    const data = team.data();
-    if(!data) return;
+        timer = 0;
 
-    resetStats();
+        scanCore();
+        scanPower();
+    }
 
-    data.buildings.each(build=>{
+});
 
-        if(!build) return;
-
-        const block = build.block;
-        if(!block) return;
-
-        // DRILL
-        if(block instanceof Drill){
-
-            const item = build.dominantItem;
-
-            if(item && build.lastDrillSpeed){
-                addProduction(item, build.lastDrillSpeed);
-            }
-
-        }
-
-        // FACTORY
-        if(block instanceof GenericCrafter){
-
-            const output = block.outputItem;
-
-            if(output){
-                addProduction(output.item, 1 / block.craftTime);
-            }
-
-        }
-
-        // POWER PRODUCED
-        if(block.powerProduction > 0){
-            powerProduced += block.powerProduction;
-        }
-
-        // POWER USED
-        if(block.consumes){
-            const power = block.consumes.getPower();
-
-            if(power){
-                powerUsed += power.usage;
-            }
-        }
-
+Events.on(EventType.ClientLoadEvent, e=>{
+    Time.runTask(10, ()=>{
+        drawUI();
     });
-}
-
-// quét mỗi 3 giây
-Timer.schedule(()=>{
-    scanBuildings();
-},3,3);
-
-
-// UI
-Events.on(ClientLoadEvent, e=>{
-
-    const button = new TextButton("Stats", Styles.defaultt);
-
-    button.clicked(()=>{
-
-        const dialog = new BaseDialog("Production Statistics");
-
-        dialog.cont.pane(table=>{
-
-            table.update(()=>{
-
-                table.clear();
-
-                table.add("[accent]Power Statistics").left().row();
-                table.add("Produced: "+powerProduced.toFixed(1)).left().row();
-                table.add("Used: "+powerUsed.toFixed(1)).left().row();
-
-                table.row();
-
-                table.add("[accent]Items / minute").left().row();
-
-                Vars.content.items().each(item=>{
-
-                    const value = production[item.id] || 0;
-
-                    if(value > 0){
-                        table.add(
-                            item.localizedName + ": " +
-                            (value*60).toFixed(1) + "/min"
-                        ).left().row();
-                    }
-
-                });
-
-            });
-
-        }).size(520,420);
-
-        dialog.addCloseButton();
-        dialog.show();
-
-    });
-
-    Vars.ui.hudGroup.addChild(button);
-
-    button.setSize(130,50);
-    button.setPosition(20,120);
-
 });
