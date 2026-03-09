@@ -9,29 +9,41 @@ function resetStats(){
 }
 
 function addProduction(item, amount){
+    if(!item) return;
+
     if(production[item.id] == null){
         production[item.id] = 0;
     }
+
     production[item.id] += amount;
 }
 
 function scanBuildings(){
 
-    resetStats();
+    if(!Vars.state || !Vars.state.isGame()) return;
+    if(!Vars.player) return;
 
     const team = Vars.player.team();
-    const builds = team.data().buildings;
+    if(!team) return;
 
-    builds.each(build => {
+    const data = team.data();
+    if(!data) return;
+
+    resetStats();
+
+    data.buildings.each(build=>{
+
+        if(!build) return;
 
         const block = build.block;
+        if(!block) return;
 
         // DRILL
         if(block instanceof Drill){
 
             const item = build.dominantItem;
 
-            if(item != null && build.lastDrillSpeed != null){
+            if(item && build.lastDrillSpeed){
                 addProduction(item, build.lastDrillSpeed);
             }
 
@@ -42,7 +54,7 @@ function scanBuildings(){
 
             const output = block.outputItem;
 
-            if(output != null){
+            if(output){
                 addProduction(output.item, 1 / block.craftTime);
             }
 
@@ -54,13 +66,15 @@ function scanBuildings(){
         }
 
         // POWER USED
-        const power = block.consumes.getPower();
-        if(power != null){
-            powerUsed += power.usage;
+        if(block.consumes){
+            const power = block.consumes.getPower();
+
+            if(power){
+                powerUsed += power.usage;
+            }
         }
 
     });
-
 }
 
 // quét mỗi 3 giây
@@ -69,6 +83,7 @@ Timer.schedule(()=>{
 },3,3);
 
 
+// UI
 Events.on(ClientLoadEvent, e=>{
 
     const button = new TextButton("Stats", Styles.defaultt);
@@ -83,24 +98,30 @@ Events.on(ClientLoadEvent, e=>{
 
                 table.clear();
 
-                table.add("[accent]Power").row();
-                table.add("Produced: "+powerProduced.toFixed(1)).row();
-                table.add("Used: "+powerUsed.toFixed(1)).row();
+                table.add("[accent]Power Statistics").left().row();
+                table.add("Produced: "+powerProduced.toFixed(1)).left().row();
+                table.add("Used: "+powerUsed.toFixed(1)).left().row();
+
                 table.row();
+
+                table.add("[accent]Items / minute").left().row();
 
                 Vars.content.items().each(item=>{
 
                     const value = production[item.id] || 0;
 
                     if(value > 0){
-                        table.add(item.localizedName + " " + (value*60).toFixed(1) + "/min").left().row();
+                        table.add(
+                            item.localizedName + ": " +
+                            (value*60).toFixed(1) + "/min"
+                        ).left().row();
                     }
 
                 });
 
             });
 
-        }).size(500,400);
+        }).size(520,420);
 
         dialog.addCloseButton();
         dialog.show();
@@ -108,7 +129,8 @@ Events.on(ClientLoadEvent, e=>{
     });
 
     Vars.ui.hudGroup.addChild(button);
-    button.setSize(120,50);
+
+    button.setSize(130,50);
     button.setPosition(20,120);
 
 });
